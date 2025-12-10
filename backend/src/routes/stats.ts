@@ -3,17 +3,6 @@ import { listWorkouts } from '../db/workoutRepo';
 
 const router = Router();
 
-/**
- * GET /stats/summary
- *
- * Returns aggregate stats across all workouts:
- * - totalDistanceMeters
- * - workoutCount
- * - distanceByFocus
- * - distanceByProfile
- * - distanceLast7Days
- * - distanceLast30Days
- */
 router.get('/summary', async (_req: Request, res: Response) => {
   try {
     const workouts = await listWorkouts();

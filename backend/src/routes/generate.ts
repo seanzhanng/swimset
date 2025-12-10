@@ -10,25 +10,6 @@ type GenerateRequestBody = GenerateConstraints;
 const VALID_FOCUS: GenerateConstraints['focus'][] = ['aerobic', 'threshold', 'sprint', 'technique'];
 const VALID_PROFILE: GenerateConstraints['profile'][] = ['novice', 'intermediate', 'elite'];
 
-/**
- * POST /generate
- *
- * Request body:
- *   {
- *     "poolLengthMeters": 25,
- *     "targetDistanceMeters": 3000,
- *     "targetDurationMinutes": 90,
- *     "focus": "threshold",
- *     "profile": "intermediate",
- *     "title": "Threshold Tuesday"
- *   }
- *
- * Response:
- *   {
- *     "dsl": "<generated DSL text>",
- *     "interpreted": InterpretedWorkout
- *   }
- */
 router.post('/', (req: Request<unknown, unknown, GenerateRequestBody>, res: Response) => {
   const body = req.body;
 

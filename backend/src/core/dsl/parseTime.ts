@@ -1,24 +1,3 @@
-/**
- * Utilities for parsing time strings used in swim sets.
- *
- * Examples of supported formats:
- *   "1:40"  -> 100 seconds
- *   "0:45"  -> 45 seconds
- *   "45"    -> 45 seconds
- *   "2:00"  -> 120 seconds
- *
- * We keep this intentionally simple for v1 and only support:
- *   - MM:SS
- *   - M:SS
- *   - SS
- */
-
-/**
- * Parse a time string (e.g., "1:40") into a number of seconds.
- *
- * @param input Raw time string from the DSL.
- * @returns Number of seconds, or undefined if the value is invalid.
- */
 export function parseTimeToSeconds(input: string | undefined | null): number | undefined {
   if (!input) return undefined;
 
@@ -28,12 +7,10 @@ export function parseTimeToSeconds(input: string | undefined | null): number | u
     return undefined;
   }
 
-  // Case 1: MM:SS or M:SS (contains a colon)
   if (trimmed.includes(':')) {
     const parts = trimmed.split(':');
 
     if (parts.length !== 2) {
-      // e.g. "1:2:3" – not supported
       return undefined;
     }
 
@@ -49,7 +26,6 @@ export function parseTimeToSeconds(input: string | undefined | null): number | u
     return minutes * 60 + seconds;
   }
 
-  // Case 2: plain seconds ("45", "100", etc.)
   const asSeconds = Number.parseInt(trimmed, 10);
 
   if (!Number.isFinite(asSeconds) || asSeconds < 0) {
@@ -59,15 +35,6 @@ export function parseTimeToSeconds(input: string | undefined | null): number | u
   return asSeconds;
 }
 
-/**
- * Format a number of seconds back into a "M:SS" string.
- * Not strictly required for the interpreter, but useful for
- * logging, debugging, or UI display.
- *
- * Example:
- *   100 -> "1:40"
- *   45  -> "0:45"
- */
 export function formatSecondsAsTime(totalSeconds: number | undefined): string | undefined {
   if (totalSeconds === undefined) return undefined;
   if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return undefined;

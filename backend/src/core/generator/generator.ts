@@ -1,37 +1,25 @@
-// src/core/generator/generator.ts
-
 export type Focus = 'aerobic' | 'threshold' | 'sprint' | 'technique';
 export type Profile = 'novice' | 'intermediate' | 'elite';
 
 export interface GenerateConstraints {
-  poolLengthMeters: number;              // 25 or 50 typically
-  targetDistanceMeters?: number;         // e.g. 3000
-  targetDurationMinutes?: number;        // not heavily used yet
+  poolLengthMeters: number;
+  targetDistanceMeters?: number;
+  targetDurationMinutes?: number;
   focus: Focus;
   profile: Profile;
   title?: string;
 }
 
-/**
- * One logical line in the template.
- * We scale baseReps to hit the target total distance.
- */
 interface TemplateLine {
   section: 'warmup' | 'preset' | 'main' | 'cooldown';
-  baseReps: number;          // reps at baseline template size
-  distance: number;          // per-rep distance in meters (for a 25m pool; normalized to pool)
-  stroke: string;            // 'FR', 'kick', 'drill', 'choice', etc.
-  sendOff?: string;          // "1:30", "0:40", ...
-  intensity?: string;        // 'easy', 'aerobic', 'moderate', 'thresh', 'sprint', 'fast', 'build', ...
-  comment?: string;          // optional comment line before the set
+  baseReps: number;
+  distance: number;
+  stroke: string;
+  sendOff?: string;
+  intensity?: string;
+  comment?: string;
 }
 
-/**
- * Main generator entry point.
- * - Picks a template based on focus
- * - Scales reps to approximate targetDistanceMeters (or a sensible default)
- * - Emits DSL that looks like a real coach workout.
- */
 export function generateWorkoutDSL(goal: GenerateConstraints): string {
   const pool = goal.poolLengthMeters;
 
@@ -41,7 +29,6 @@ export function generateWorkoutDSL(goal: GenerateConstraints): string {
   const targetTotal = chooseTargetDistance(goal, baseTotal);
   const scale = targetTotal / baseTotal;
 
-  // Accumulate lines per section
   const sections: Record<'warmup' | 'preset' | 'main' | 'cooldown', string[]> = {
     warmup: [],
     preset: [],
@@ -52,18 +39,16 @@ export function generateWorkoutDSL(goal: GenerateConstraints): string {
   for (const line of template) {
     const sectionLines = sections[line.section];
 
-    // Optional comment line above the set
     if (line.comment) {
       sectionLines.push(`# ${line.comment}`);
     }
 
     const effectiveDistance = normalizeToPool(line.distance, pool);
 
-    // Scale reps, but keep within a sane range
     let scaledReps = Math.round(line.baseReps * scale);
     if (scaledReps < 1) scaledReps = 1;
 
-    const maxReps = line.baseReps * 3; // don't explode to 40×100 just because someone put 6k
+    const maxReps = line.baseReps * 3;
     if (scaledReps > maxReps) scaledReps = maxReps;
 
     const dsl = buildSetLine(
@@ -77,7 +62,6 @@ export function generateWorkoutDSL(goal: GenerateConstraints): string {
     sectionLines.push(dsl);
   }
 
-  // Build header
   const lines: string[] = [];
   lines.push(`pool ${pool}m`);
   if (goal.targetDurationMinutes) {
@@ -90,7 +74,6 @@ export function generateWorkoutDSL(goal: GenerateConstraints): string {
   lines.push(`profile ${goal.profile}`);
   lines.push('');
 
-  // Output sections in a consistent order
   const order: Array<keyof typeof sections> = ['warmup', 'preset', 'main', 'cooldown'];
 
   for (const sectionName of order) {
@@ -104,7 +87,6 @@ export function generateWorkoutDSL(goal: GenerateConstraints): string {
     lines.push('');
   }
 
-  // Strip trailing blank lines
   while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
     lines.pop();
   }
@@ -112,9 +94,6 @@ export function generateWorkoutDSL(goal: GenerateConstraints): string {
   return lines.join('\n');
 }
 
-/**
- * Compute the baseline total distance of a template for a given pool length.
- */
 function computeTemplateDistance(template: TemplateLine[], pool: number): number {
   let total = 0;
   for (const line of template) {
@@ -124,11 +103,6 @@ function computeTemplateDistance(template: TemplateLine[], pool: number): number
   return total;
 }
 
-/**
- * Decide what total distance this workout should be.
- * - If coach gave targetDistanceMeters, honor it (clamped).
- * - Otherwise, use template size adjusted by profile.
- */
 function chooseTargetDistance(goal: GenerateConstraints, baseTotal: number): number {
   let target = goal.targetDistanceMeters;
   if (!target || target <= 0) {
@@ -140,15 +114,10 @@ function chooseTargetDistance(goal: GenerateConstraints, baseTotal: number): num
     target = Math.round(baseTotal * profileFactor);
   }
 
-  // Clamp to a realistic practice size
   target = clamp(target, 1500, 6000);
   return target;
 }
 
-/**
- * Build one DSL set line, honoring your grammar:
- * [reps]x? <distance> <stroke> [@time] [intensity]
- */
 function buildSetLine(
   reps: number,
   distance: number,
@@ -166,10 +135,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-/**
- * Ensure the distance is a multiple of pool length.
- * If someone writes 75 in a 50m pool, make it 100, etc.
- */
 function normalizeToPool(distance: number, pool: number): number {
   if (distance <= 0) return pool;
   const remainder = distance % pool;
@@ -177,26 +142,7 @@ function normalizeToPool(distance: number, pool: number): number {
   return distance + (pool - remainder);
 }
 
-// ---------------------------------------------------------------------------
-// Templates
-// ---------------------------------------------------------------------------
-//
-// Each template is written for a 25m baseline pool using common
-// coaching patterns from real workouts: warmup + preset + multi-part main + cooldown.
-// Distances are automatically normalized for 50m pools and scaled by reps.
-
-/**
- * AEROBIC TEMPLATE
- *
- * Rough baseline (25m pool, intermediate profile, no explicit target):
- * - Warmup ~600
- * - Preset ~500
- * - Main ~1400
- * - Cooldown ~300
- * ≈ 2800m before scaling.
- */
 const AEROBIC_TEMPLATE: TemplateLine[] = [
-  // Warmup
   {
     section: 'warmup',
     baseReps: 1,
@@ -223,8 +169,6 @@ const AEROBIC_TEMPLATE: TemplateLine[] = [
     intensity: 'build',
     comment: 'Build 1–4, finish near race tempo'
   },
-
-  // Preset – light kick + pull
   {
     section: 'preset',
     baseReps: 6,
@@ -243,8 +187,6 @@ const AEROBIC_TEMPLATE: TemplateLine[] = [
     intensity: 'aerobic',
     comment: 'Pull with buoy, focus on distance per stroke'
   },
-
-  // Main – steady aerobic 100s + moderate 200s
   {
     section: 'main',
     baseReps: 6,
@@ -263,8 +205,6 @@ const AEROBIC_TEMPLATE: TemplateLine[] = [
     intensity: 'moderate',
     comment: 'Longer repeats, smooth & controlled'
   },
-
-  // Cooldown
   {
     section: 'cooldown',
     baseReps: 1,
@@ -282,18 +222,7 @@ const AEROBIC_TEMPLATE: TemplateLine[] = [
   }
 ];
 
-/**
- * THRESHOLD TEMPLATE
- *
- * Baseline (25m pool, intermediate):
- * - Warmup ~700
- * - Preset ~600
- * - Main ~1600 (multiple threshold blocks)
- * - Cooldown ~300
- * ≈ 3200m before scaling.
- */
 const THRESHOLD_TEMPLATE: TemplateLine[] = [
-  // Warmup
   {
     section: 'warmup',
     baseReps: 1,
@@ -329,8 +258,6 @@ const THRESHOLD_TEMPLATE: TemplateLine[] = [
     intensity: 'moderate',
     comment: 'Short kick to wake legs'
   },
-
-  // Preset – prep for threshold
   {
     section: 'preset',
     baseReps: 6,
@@ -357,8 +284,6 @@ const THRESHOLD_TEMPLATE: TemplateLine[] = [
     intensity: 'easy',
     comment: 'Easy before main set'
   },
-
-  // Main – multiple threshold pieces + some 50s
   {
     section: 'main',
     baseReps: 8,
@@ -395,8 +320,6 @@ const THRESHOLD_TEMPLATE: TemplateLine[] = [
     intensity: 'easy',
     comment: 'Easy active recovery'
   },
-
-  // Cooldown
   {
     section: 'cooldown',
     baseReps: 1,
@@ -414,18 +337,7 @@ const THRESHOLD_TEMPLATE: TemplateLine[] = [
   }
 ];
 
-/**
- * SPRINT TEMPLATE
- *
- * Baseline (25m pool, intermediate):
- * - Warmup ~600
- * - Preset ~400
- * - Main ~1200 (lots of 25s + some 50s/kick)
- * - Cooldown ~400
- * ≈ 2600m before scaling.
- */
 const SPRINT_TEMPLATE: TemplateLine[] = [
-  // Warmup
   {
     section: 'warmup',
     baseReps: 1,
@@ -452,8 +364,6 @@ const SPRINT_TEMPLATE: TemplateLine[] = [
     intensity: 'build',
     comment: 'Build 1–4, faster into the wall'
   },
-
-  // Preset – speed prep
   {
     section: 'preset',
     baseReps: 8,
@@ -472,8 +382,6 @@ const SPRINT_TEMPLATE: TemplateLine[] = [
     intensity: 'build',
     comment: 'Build 1–4, last 15m strong'
   },
-
-  // Main – short sprints with equal easy volume
   {
     section: 'main',
     baseReps: 12,
@@ -510,8 +418,6 @@ const SPRINT_TEMPLATE: TemplateLine[] = [
     intensity: 'sprint',
     comment: '50s from a push, race effort'
   },
-
-  // Cooldown
   {
     section: 'cooldown',
     baseReps: 1,
@@ -529,18 +435,7 @@ const SPRINT_TEMPLATE: TemplateLine[] = [
   }
 ];
 
-/**
- * TECHNIQUE TEMPLATE
- *
- * Baseline (25m pool, intermediate):
- * - Warmup ~600
- * - Preset ~800 (drill + kick + more drill)
- * - Main ~1000 (aerobic FR + drill)
- * - Cooldown ~400
- * ≈ 2800m before scaling.
- */
 const TECHNIQUE_TEMPLATE: TemplateLine[] = [
-  // Warmup
   {
     section: 'warmup',
     baseReps: 1,
@@ -567,8 +462,6 @@ const TECHNIQUE_TEMPLATE: TemplateLine[] = [
     intensity: 'build',
     comment: 'Build 1–4, hold good form'
   },
-
-  // Preset – technique block: drill + kick + drill + short drill
   {
     section: 'preset',
     baseReps: 4,
@@ -605,8 +498,6 @@ const TECHNIQUE_TEMPLATE: TemplateLine[] = [
     intensity: 'aerobic',
     comment: 'Short drill 25s, very precise'
   },
-
-  // Main – mostly aerobic FR but technique-focused
   {
     section: 'main',
     baseReps: 8,
@@ -625,8 +516,6 @@ const TECHNIQUE_TEMPLATE: TemplateLine[] = [
     intensity: 'aerobic',
     comment: 'Finish with pure drills'
   },
-
-  // Cooldown
   {
     section: 'cooldown',
     baseReps: 1,

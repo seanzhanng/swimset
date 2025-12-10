@@ -3,16 +3,6 @@ import { formatSecondsAsTime } from '../dsl/parseTime';
 
 export type PdfViewMode = 'coach' | 'swimmer';
 
-/**
- * Render an interpreted workout as an HTML document string.
- *
- * For v1:
- *  - Simple, readable layout
- *  - Slightly different text for coach vs swimmer views
- *  - Inline CSS for easy server-side rendering
- *
- * NOTE: Warnings are intentionally NOT rendered in the PDF.
- */
 export function renderWorkoutHtml(
   workout: InterpretedWorkout,
   view: PdfViewMode

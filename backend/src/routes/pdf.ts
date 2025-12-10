@@ -1,4 +1,3 @@
-// src/routes/pdf.ts
 import { Router, Request, Response } from 'express';
 import { getWorkoutById } from '../db/workoutRepo';
 import { interpretShorthand } from '../core/dsl/interpreter';
@@ -7,14 +6,6 @@ import { renderWorkoutHtml } from '../core/pdf/renderHtml';
 
 const router = Router();
 
-/**
- * GET /workouts/:id/pdf?view=coach|swimmer
- *
- * - Loads workout from DB
- * - Interprets shorthand DSL
- * - Renders HTML (coach or swimmer view)
- * - Generates PDF via Playwright
- */
 router.get('/workouts/:id/pdf', async (req: Request, res: Response) => {
   const { id } = req.params;
   const viewParam = (req.query.view as string) || 'coach';

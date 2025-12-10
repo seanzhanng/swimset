@@ -36,16 +36,12 @@ private enum WorkoutProfile: String, CaseIterable, Identifiable {
 
 struct GenerateWorkoutView: View {
 
-    // MARK: - Form state
-
     @State private var poolLengthMeters: Int = 25
     @State private var targetDistanceText: String = "3000"
     @State private var targetDurationText: String = ""
     @State private var selectedFocus: WorkoutFocus = .threshold
     @State private var selectedProfile: WorkoutProfile = .intermediate
     @State private var title: String = "Threshold Tuesday"
-
-    // MARK: - Result state
 
     @State private var dsl: String?
     @State private var interpreted: InterpretedWorkoutDTO?
@@ -158,8 +154,6 @@ struct GenerateWorkoutView: View {
         }
     }
 
-    // MARK: - Generate actions
-
     private func generateTapped() {
         Task {
             await generateAsync()
@@ -211,8 +205,6 @@ struct GenerateWorkoutView: View {
             }
         }
     }
-
-    // MARK: - Save actions
 
     private func saveWorkoutTapped() {
         guard let interpreted, let dsl else {
@@ -266,8 +258,6 @@ struct GenerateWorkoutView: View {
             }
         }
     }
-
-    // MARK: - Error mapping
 
     private func mapAPIError(_ error: APIError) -> String {
         switch error {

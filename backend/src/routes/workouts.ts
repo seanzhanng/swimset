@@ -11,15 +11,6 @@ import {
 
 const router = Router();
 
-/**
- * POST /workouts
- * Body: { title?, shorthand, poolLengthMeters?, plannedDurationMinutes?, focus?, profile? }
- *
- * - Interprets the shorthand
- * - Computes total distance
- * - Saves to DB
- * - Returns { workout, interpreted }
- */
 router.post('/', async (req: Request, res: Response) => {
   try {
     const {
@@ -62,10 +53,6 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /workouts
- * Returns: { workouts: WorkoutRow[] }
- */
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const workouts: WorkoutRow[] = await listWorkouts();
@@ -76,10 +63,6 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /workouts/:id
- * Returns: { workout, interpreted }
- */
 router.get('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
 
@@ -98,14 +81,6 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * PUT /workouts/:id
- * Body: { title?, shorthand, poolLengthMeters?, plannedDurationMinutes?, focus?, profile? }
- *
- * - Re-interprets shorthand
- * - Updates DB row
- * - Returns { workout, interpreted }
- */
 router.put('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
 
@@ -154,12 +129,6 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * DELETE /workouts/:id
- * - Deletes a workout
- * - 204 if deleted
- * - 404 if not found
- */
 router.delete('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
 

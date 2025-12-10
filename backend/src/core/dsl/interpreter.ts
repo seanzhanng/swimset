@@ -1,5 +1,4 @@
 import {
-  GenerateConstraints, // not used here yet, but likely in future
   InterpretedWorkout,
   ParseError,
   SectionName,
@@ -9,28 +8,9 @@ import {
 } from '../models/WorkoutTypes';
 import { parseTimeToSeconds } from './parseTime';
 
-/**
- * Regex for parsing a single set line in the DSL.
- *
- * Grammar (simplified):
- *   [reps]x? <distance> <stroke> [@<time>] [<intensity>]
- *
- * Examples:
- *   "200 FR easy"
- *   "4x50 drill @1:00"
- *   "10x100 FR @1:40 thresh"
- *   "8x25 kick @0:45 fast"
- */
 const SET_LINE_REGEX =
   /^(?:(\d+)x)?(\d+)\s+(\S+)(?:\s+@(\S+))?(?:\s+(\S+))?$/;
 
-/**
- * Interpret a shorthand DSL workout script into a structured object.
- *
- * This function is pure and has no side effects:
- * - No DB access
- * - No logging beyond basic error reporting upstream
- */
 export function interpretShorthand(text: string): InterpretedWorkout {
   const header: WorkoutHeader = {};
   const sets: SetInterval[] = [];
@@ -42,16 +22,14 @@ export function interpretShorthand(text: string): InterpretedWorkout {
   const lines = text.split(/\r?\n/);
 
   for (let index = 0; index < lines.length; index += 1) {
-    const lineNumber = index + 1; // 1-based
+    const lineNumber = index + 1;
     const rawLine = lines[index];
     const trimmed = rawLine.trim();
 
-    // Skip empty lines and comments
     if (trimmed.length === 0 || trimmed.startsWith('#')) {
       continue;
     }
 
-    // Section lines: "warmup:", "main:", etc.
     if (trimmed.endsWith(':')) {
       const sectionName = trimmed.slice(0, -1).trim().toLowerCase();
       if (sectionName.length === 0) {
@@ -65,12 +43,10 @@ export function interpretShorthand(text: string): InterpretedWorkout {
       continue;
     }
 
-    // Header lines: pool, duration, title, focus, profile
     if (handleHeaderLine(trimmed, header, lineNumber, errors)) {
       continue;
     }
 
-    // Otherwise, treat as a potential set line
     const set = parseSetLine(trimmed, currentSection, lineNumber, errors);
     if (set) {
       sets.push({
@@ -88,7 +64,6 @@ export function interpretShorthand(text: string): InterpretedWorkout {
     totals.estimatedMinutes = estimatedMinutes;
   }
 
-  // Duration vs planned comparison warnings
   if (header.plannedDurationMinutes !== undefined && totals.estimatedMinutes !== undefined) {
     const diff = totals.estimatedMinutes - header.plannedDurationMinutes;
     const absDiff = Math.abs(diff);
@@ -123,11 +98,6 @@ export function interpretShorthand(text: string): InterpretedWorkout {
   };
 }
 
-/**
- * Try to interpret a line as a header line (pool, duration, title, focus, profile).
- *
- * Returns true if the line was a recognized header and handled.
- */
 function handleHeaderLine(
   trimmedLine: string,
   header: WorkoutHeader,
@@ -185,15 +155,10 @@ function handleHeaderLine(
     }
 
     default:
-      // Not a recognized header key
       return false;
   }
 }
 
-/**
- * Extract the first integer found in a string.
- * Example: "25m" -> 25, "90min" -> 90
- */
 function extractInteger(source: string | undefined): number | undefined {
   if (!source) return undefined;
   const match = source.match(/(\d+)/);
@@ -204,11 +169,6 @@ function extractInteger(source: string | undefined): number | undefined {
   return value;
 }
 
-/**
- * Parse a DSL set line using SET_LINE_REGEX.
- *
- * Returns a partial SetInterval (without raw/lineNumber) or null if parsing fails.
- */
 function parseSetLine(
   trimmedLine: string,
   currentSection: SectionName,
@@ -269,9 +229,6 @@ function parseSetLine(
   };
 }
 
-/**
- * Compute total distance and breakdowns by section and intensity.
- */
 function computeTotals(sets: SetInterval[]): WorkoutTotals {
   let totalDistanceMeters = 0;
   const distanceBySection: Record<SectionName, number> = {} as Record<SectionName, number>;
@@ -297,13 +254,6 @@ function computeTotals(sets: SetInterval[]): WorkoutTotals {
   };
 }
 
-/**
- * Estimate workout duration in minutes.
- *
- * Strategy:
- *  - If a majority of sets have sendOffSeconds, sum (reps * sendOffSeconds) for those sets.
- *  - Otherwise, estimate using a default pace (e.g., 1:30 per 100m).
- */
 function estimateDurationMinutes(sets: SetInterval[], totalDistanceMeters: number): number | undefined {
   if (sets.length === 0) {
     return undefined;
@@ -311,7 +261,6 @@ function estimateDurationMinutes(sets: SetInterval[], totalDistanceMeters: numbe
 
   const setsWithSendOff = sets.filter((s) => s.sendOffSeconds !== undefined);
 
-  // Case 1: majority have explicit send-off times
   if (setsWithSendOff.length >= sets.length / 2) {
     let totalSeconds = 0;
     for (const set of setsWithSendOff) {
@@ -322,12 +271,11 @@ function estimateDurationMinutes(sets: SetInterval[], totalDistanceMeters: numbe
     return totalSeconds / 60;
   }
 
-  // Case 2: estimate based on a default pace per 100m
   if (totalDistanceMeters <= 0) {
     return undefined;
   }
 
-  const defaultPaceSecondsPer100 = 90; // 1:30 per 100m
+  const defaultPaceSecondsPer100 = 90;
   const totalSeconds = (totalDistanceMeters / 100) * defaultPaceSecondsPer100;
   return totalSeconds / 60;
 }

@@ -34,9 +34,6 @@ interface UpdateWorkoutParams {
   totalDistanceMeters?: number;
 }
 
-/**
- * Insert a new workout row and return the created record (camelCased).
- */
 export async function createWorkout(params: CreateWorkoutParams): Promise<WorkoutRow> {
   const {
     title,
@@ -86,9 +83,6 @@ export async function createWorkout(params: CreateWorkoutParams): Promise<Workou
   return result.rows[0];
 }
 
-/**
- * Update an existing workout row and return the updated record, or null if not found.
- */
 export async function updateWorkoutById(
   id: string,
   params: UpdateWorkoutParams
@@ -143,9 +137,6 @@ export async function updateWorkoutById(
   return result.rows[0] ?? null;
 }
 
-/**
- * Fetch a single workout by id.
- */
 export async function getWorkoutById(id: string): Promise<WorkoutRow | null> {
   const result = await query<WorkoutRow>(
     `
@@ -169,9 +160,6 @@ export async function getWorkoutById(id: string): Promise<WorkoutRow | null> {
   return result.rows[0] ?? null;
 }
 
-/**
- * List all workouts (for now, ordered newest first).
- */
 export async function listWorkouts(): Promise<WorkoutRow[]> {
   const result = await query<WorkoutRow>(
     `
@@ -194,11 +182,6 @@ export async function listWorkouts(): Promise<WorkoutRow[]> {
   return result.rows;
 }
 
-/**
- * Delete a workout by id.
- *
- * Returns true if a row was deleted, false if not found.
- */
 export async function deleteWorkoutById(id: string): Promise<boolean> {
   const result = await query(
     `

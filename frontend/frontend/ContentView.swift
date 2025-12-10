@@ -2,8 +2,6 @@ import SwiftUI
 
 struct ContentView: View {
 
-    // MARK: - State
-
     @State private var workoutTitle: String = "Threshold Tuesday"
 
     @State private var shorthandText: String = """
@@ -28,13 +26,9 @@ struct ContentView: View {
     @State private var isSaving: Bool = false
     @State private var saveMessage: String?
 
-    // MARK: - Body
-
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
-
-                // MARK: Title + Input editor
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Title")
@@ -55,8 +49,6 @@ struct ContentView: View {
                                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                         )
                 }
-
-                // MARK: Buttons + status
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 12) {
@@ -102,8 +94,6 @@ struct ContentView: View {
                     }
                 }
 
-                // MARK: Results
-
                 if let interpreted {
                     Divider()
                     WorkoutResultsView(interpreted: interpreted)
@@ -115,8 +105,6 @@ struct ContentView: View {
             .navigationTitle("SwimSet")
         }
     }
-
-    // MARK: - Interpret actions
 
     private func interpretButtonTapped() {
         let trimmed = shorthandText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -158,8 +146,6 @@ struct ContentView: View {
             }
         }
     }
-
-    // MARK: - Save actions
 
     private func saveWorkoutTapped() {
         guard let interpreted else {
@@ -214,8 +200,6 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Error mapping
-
     private func mapAPIError(_ error: APIError) -> String {
         switch error {
         case .invalidURL:
@@ -232,16 +216,12 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Results View (shared by Write + Generate)
-
 struct WorkoutResultsView: View {
     let interpreted: InterpretedWorkoutDTO
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-
-                // Summary
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Summary")
                         .font(.headline)
@@ -252,8 +232,6 @@ struct WorkoutResultsView: View {
                         Text(String(format: "Estimated duration: %.1f min", est))
                     }
                 }
-
-                // Sets grouped by section
                 ForEach(groupSetsBySection(interpreted.sets), id: \.section) { section in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -293,7 +271,6 @@ struct WorkoutResultsView: View {
                     .cornerRadius(8)
                 }
 
-                // Warnings
                 if !interpreted.warnings.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Warnings")
@@ -306,7 +283,6 @@ struct WorkoutResultsView: View {
                     }
                 }
 
-                // Parse errors (if any)
                 if !interpreted.errors.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Parse Errors")
@@ -321,8 +297,6 @@ struct WorkoutResultsView: View {
             }
         }
     }
-
-    // MARK: - Helpers
 
     private func groupSetsBySection(_ sets: [WorkoutSetInterval]) -> [SectionGroup] {
         var dict: [String: [WorkoutSetInterval]] = [:]

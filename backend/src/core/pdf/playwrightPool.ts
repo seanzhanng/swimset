@@ -1,11 +1,5 @@
 import { chromium, Browser } from 'playwright';
 
-/**
- * Simple Playwright "pool":
- *  - One shared Browser instance
- *  - New context + page per request (good isolation, still fast)
- */
-
 let browser: Browser | null = null;
 
 export async function initPlaywright(): Promise<void> {
@@ -18,12 +12,8 @@ export async function initPlaywright(): Promise<void> {
   console.log('[playwright] Chromium launched');
 }
 
-/**
- * Convert an HTML string to a PDF buffer.
- */
 export async function htmlToPdf(html: string): Promise<Buffer> {
   if (!browser) {
-    // Safety: initialize if not already done
     await initPlaywright();
   }
 
@@ -36,7 +26,6 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
 
   try {
     await page.setContent(html, {
-      // "load" is slightly less picky than "networkidle" and is enough here
       waitUntil: 'load'
     });
 
@@ -50,8 +39,6 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
         right: '15mm'
       }
     });
-
-    // Ensure we always return a Node Buffer
     return Buffer.isBuffer(pdfBytes) ? pdfBytes : Buffer.from(pdfBytes);
   } catch (err) {
     console.error('[playwright] htmlToPdf error:', err);

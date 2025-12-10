@@ -60,7 +60,6 @@ struct WorkoutsListView: View {
 
         do {
             let result = try await APIClient.shared.listWorkouts()
-            // Sort newest first
             let sorted = result.sorted(by: { $0.createdAt > $1.createdAt })
             await MainActor.run {
                 self.workouts = sorted
@@ -116,8 +115,6 @@ struct WorkoutsListView: View {
             return "No data from server."
         }
     }
-
-    // MARK: - Row
 
     private struct WorkoutRow: View {
         let workout: WorkoutRecordDTO

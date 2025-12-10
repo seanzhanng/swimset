@@ -9,14 +9,12 @@ struct WorkoutDetailView: View {
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
 
-    // Editing state
     @State private var isEditing: Bool = false
     @State private var editableTitle: String = ""
     @State private var editableShorthand: String = ""
     @State private var isSavingChanges: Bool = false
     @State private var saveMessage: String?
 
-    // PDF export state
     @State private var isDownloadingPDF: Bool = false
     @State private var pdfURL: URL?
     @State private var isPresentingShareSheet: Bool = false
@@ -81,8 +79,6 @@ struct WorkoutDetailView: View {
             .padding()
         }
     }
-
-    // MARK: - Editing UI
 
     private var editingSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -194,8 +190,6 @@ struct WorkoutDetailView: View {
         }
     }
 
-    // MARK: - Data loading
-
     private func loadWorkout() async {
         await MainActor.run {
             isLoading = true
@@ -225,14 +219,10 @@ struct WorkoutDetailView: View {
         }
     }
 
-    // MARK: - Editing actions
-
     private func toggleEditing() {
         if isEditing {
-            // Leaving edit mode – clear transient errors
             errorMessage = nil
         } else if let workout {
-            // Entering edit mode – ensure fields are populated
             editableTitle = workout.title ?? ""
             editableShorthand = workout.shorthand
             errorMessage = nil
@@ -259,7 +249,6 @@ struct WorkoutDetailView: View {
         let titleValue = editableTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let titleOrNil = titleValue.isEmpty ? nil : titleValue
 
-        // Use interpreted header if available, otherwise fall back to stored fields
         let poolLength = interpreted?.header.poolLengthMeters ?? currentWorkout.poolLengthMeters
         let plannedDuration = interpreted?.header.plannedDurationMinutes ?? currentWorkout.plannedDurationMinutes
         let focus = interpreted?.header.focus ?? currentWorkout.focus
@@ -296,8 +285,6 @@ struct WorkoutDetailView: View {
         }
     }
 
-    // MARK: - PDF export
-
     private func exportPDF(view: String) {
         Task {
             await exportPDFAsync(view: view)
@@ -308,7 +295,6 @@ struct WorkoutDetailView: View {
         await MainActor.run {
             isDownloadingPDF = true
             lastPDFViewMode = view
-            // Do not clear edit/save messages when exporting
         }
 
         do {
@@ -336,8 +322,6 @@ struct WorkoutDetailView: View {
             }
         }
     }
-
-    // MARK: - Error mapping
 
     private func mapAPIError(_ error: APIError) -> String {
         switch error {

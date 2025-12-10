@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - Core workout types (matches backend JSON)
-
 struct WorkoutHeader: Codable {
     var poolLengthMeters: Int?
     var plannedDurationMinutes: Int?
@@ -11,7 +9,7 @@ struct WorkoutHeader: Codable {
 }
 
 struct WorkoutSetInterval: Codable, Identifiable {
-    let id: UUID = UUID()  // Local SwiftUI-only ID
+    let id: UUID = UUID()
 
     var section: String
     var reps: Int
@@ -48,8 +46,6 @@ struct InterpretedWorkoutDTO: Codable {
     var warnings: [String]
 }
 
-// MARK: - Workout generation constraints
-
 struct GenerateConstraintsDTO: Codable {
     var poolLengthMeters: Int
     var targetDistanceMeters: Int?
@@ -63,8 +59,6 @@ struct GenerateResponseDTO: Codable {
     var dsl: String
     var interpreted: InterpretedWorkoutDTO
 }
-
-// MARK: - DB Workout records
 
 struct WorkoutRecordDTO: Codable, Identifiable {
     var id: String
@@ -110,8 +104,6 @@ struct GetWorkoutResponseDTO: Codable {
     var workout: WorkoutRecordDTO
     var interpreted: InterpretedWorkoutDTO
 }
-
-// MARK: - Stats
 
 struct StatsSummaryDTO: Codable {
     var totalDistanceMeters: Int

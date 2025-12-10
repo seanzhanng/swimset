@@ -8,16 +8,10 @@ enum APIError: Error {
     case noData
 }
 
-/// Thin wrapper around URLSession for talking to the SwimSet backend.
-///
-/// Uses async/await and Codable.
-/// Adjust `baseURL` when you deploy the backend.
 final class APIClient {
 
     static let shared = APIClient()
 
-    /// For iOS Simulator, 127.0.0.1:3000 works with a locally running backend.
-    /// On a physical device, use your Mac's LAN IP instead.
     private let baseURL = URL(string: "http://127.0.0.1:3000")!
 
     private let session: URLSession
@@ -42,9 +36,6 @@ final class APIClient {
         self.jsonEncoder = encoder
     }
 
-    // MARK: - Public JSON API
-
-    /// POST /interpret
     func interpret(shorthand: String) async throws -> InterpretedWorkoutDTO {
         struct Body: Codable { let shorthand: String }
         let body = Body(shorthand: shorthand)
@@ -57,7 +48,6 @@ final class APIClient {
         )
     }
 
-    /// POST /generate
     func generate(constraints: GenerateConstraintsDTO) async throws -> GenerateResponseDTO {
         return try await request(
             path: "/generate",
@@ -67,7 +57,6 @@ final class APIClient {
         )
     }
 
-    /// POST /workouts
     func createWorkout(_ requestDTO: CreateWorkoutRequestDTO) async throws -> CreateWorkoutResponseDTO {
         return try await request(
             path: "/workouts",
@@ -77,7 +66,6 @@ final class APIClient {
         )
     }
 
-    /// PUT /workouts/:id
     func updateWorkout(id: String, requestDTO: UpdateWorkoutRequestDTO) async throws -> GetWorkoutResponseDTO {
         return try await request(
             path: "/workouts/\(id)",
@@ -87,7 +75,6 @@ final class APIClient {
         )
     }
 
-    /// GET /workouts
     func listWorkouts() async throws -> [WorkoutRecordDTO] {
         let response: ListWorkoutsResponseDTO = try await request(
             path: "/workouts",
@@ -97,7 +84,6 @@ final class APIClient {
         return response.workouts
     }
 
-    /// GET /workouts/:id
     func getWorkout(id: String) async throws -> GetWorkoutResponseDTO {
         return try await request(
             path: "/workouts/\(id)",
@@ -106,7 +92,6 @@ final class APIClient {
         )
     }
 
-    /// DELETE /workouts/:id
     func deleteWorkout(id: String) async throws {
         let path = "/workouts/\(id)"
 
@@ -128,7 +113,6 @@ final class APIClient {
         }
     }
 
-    /// GET /stats/summary
     func getStatsSummary() async throws -> StatsSummaryDTO {
         return try await request(
             path: "/stats/summary",
@@ -137,9 +121,6 @@ final class APIClient {
         )
     }
 
-    // MARK: - PDF API
-
-    /// GET /workouts/:id/pdf?view=coach|swimmer
     func downloadWorkoutPDF(id: String, view: String) async throws -> Data {
         let path = "/workouts/\(id)/pdf?view=\(view)"
 
@@ -167,8 +148,6 @@ final class APIClient {
 
         return data
     }
-
-    // MARK: - Core JSON request helpers
 
     private func request<Body: Encodable, Response: Decodable>(
         path: String,
