@@ -1,186 +1,295 @@
-import { GenerateConstraints } from '../models/WorkoutTypes';
+// src/core/generator/generator.ts
 
 /**
- * Generate a workout in DSL form from high-level constraints.
- *
- * This function:
- *  - Builds header lines (pool, duration, title, focus, profile)
- *  - Assembles warmup, main, and cooldown blocks
- *  - Uses targetDistanceMeters (if provided) to roughly scale main set volume
- *
- * The DSL output is later interpreted by interpretShorthand().
+ * Constraints used by the generator.
+ * These are mirrored on the iOS client.
  */
-export function generateWorkoutDSL(constraints: GenerateConstraints): string {
-  const targetDistance =
-    constraints.targetDistanceMeters ?? getDefaultTargetDistance(constraints.profile);
+export type Focus = 'aerobic' | 'threshold' | 'sprint' | 'technique';
+export type Profile = 'novice' | 'intermediate' | 'elite';
 
-  const warmupBlock = buildWarmupBlock(constraints);
-  const cooldownBlock = buildCooldownBlock(constraints);
+export interface GenerateConstraints {
+  poolLengthMeters: number;              // 25 or 50, but we don't strictly enforce
+  targetDistanceMeters?: number;         // e.g., 3000
+  targetDurationMinutes?: number;        // e.g., 90 (not heavily used yet)
+  focus: Focus;
+  profile: Profile;
+  title?: string;
+}
 
-  const warmupDistance = estimateBlockDistanceMeters(warmupBlock);
-  const cooldownDistance = estimateBlockDistanceMeters(cooldownBlock);
+/**
+ * A small helper for building blocks.
+ */
+interface Block {
+  dsl: string;
+  distanceMeters: number;
+}
 
-  const remainingForMain = Math.max(targetDistance - warmupDistance - cooldownDistance, 0);
-
-  const mainBlock = buildMainBlock(constraints, remainingForMain);
-
+/**
+ * Main entry point: build DSL text for a workout from constraints.
+ *
+ * The strategy:
+ * - Choose an approximate total distance from targetDistance/profile.
+ * - Build warmup + cooldown blocks with predictable distances.
+ * - Compute remaining distance for main and choose a main template based on focus.
+ * - Scale main-set reps to get close to the remaining distance.
+ */
+export function generateWorkoutDSL(goal: GenerateConstraints): string {
   const lines: string[] = [];
 
   // Header
-  lines.push(`pool ${constraints.poolLengthMeters}m`);
-  if (constraints.targetDurationMinutes) {
-    lines.push(`duration ${constraints.targetDurationMinutes}min`);
+  lines.push(`pool ${goal.poolLengthMeters}m`);
+  if (goal.targetDurationMinutes) {
+    lines.push(`duration ${goal.targetDurationMinutes}min`);
   }
-  if (constraints.title) {
-    lines.push(`title ${constraints.title}`);
+  if (goal.title) {
+    lines.push(`title ${goal.title}`);
   }
-  lines.push(`focus ${constraints.focus}`);
-  lines.push(`profile ${constraints.profile}`);
-  lines.push(''); // blank line before sections
+  lines.push(`focus ${goal.focus}`);
+  lines.push(`profile ${goal.profile}`);
+  lines.push(''); // blank line
 
-  // Sections
-  lines.push(warmupBlock);
-  lines.push('');
-  lines.push(mainBlock);
-  lines.push('');
-  lines.push(cooldownBlock);
+  const approxTotal = chooseTargetDistance(goal);
+
+  const warmup = buildWarmupBlock(goal);
+  const cooldown = buildCooldownBlock(goal);
+
+  const remainingForMain = Math.max(
+    approxTotal - warmup.distanceMeters - cooldown.distanceMeters,
+    0
+  );
+
+  const main = buildMainBlock(goal, remainingForMain);
+
+  lines.push(warmup.dsl, '');
+  lines.push(main.dsl, '');
+  lines.push(cooldown.dsl);
 
   return lines.join('\n');
 }
 
 /**
- * Default total distance when no targetDistanceMeters is provided.
- * Tuned loosely by profile.
+ * Choose a reasonable total distance if the coach didn't specify one.
  */
-function getDefaultTargetDistance(profile: GenerateConstraints['profile']): number {
-  switch (profile) {
+function chooseTargetDistance(goal: GenerateConstraints): number {
+  if (goal.targetDistanceMeters && goal.targetDistanceMeters > 0) {
+    return goal.targetDistanceMeters;
+  }
+
+  // Simple defaults based on profile.
+  switch (goal.profile) {
     case 'novice':
-      return 2000;
+      return 2200;
     case 'intermediate':
-      return 3000;
+      return 3200;
     case 'elite':
-      return 4000;
+      return 4200;
     default:
       return 3000;
   }
 }
 
 /**
- * Build a simple warmup block.
+ * Build a warmup block with a predictable distance.
+ *
+ * We keep this pretty simple for v1: a single easy swim + a short drill set.
  */
-function buildWarmupBlock(constraints: GenerateConstraints): string {
-  const baseDistance = constraints.poolLengthMeters === 25 ? 200 : 300;
-  const drillDistancePerRep = constraints.poolLengthMeters;
-  const drillReps = 4;
+function buildWarmupBlock(goal: GenerateConstraints): Block {
+  const pool = goal.poolLengthMeters;
 
-  return [
+  // Slightly larger warmup for better profiles.
+  const baseEasy =
+    goal.profile === 'elite'
+      ? pool * 12 // e.g., 300m in 25m pool, 600m in 50m pool
+      : goal.profile === 'intermediate'
+      ? pool * 8
+      : pool * 6;
+
+  const drillReps = 4;
+  const drillDistance = drillReps * pool;
+
+  const total = baseEasy + drillDistance;
+
+  const lines: string[] = [
     'warmup:',
-    `  ${baseDistance} FR easy`,
-    `  ${drillReps}x${drillDistancePerRep} drill @1:00`
-  ].join('\n');
+    `  ${baseEasy} FR easy`,
+    `  ${drillReps}x${pool} drill @0:55`
+  ];
+
+  return {
+    dsl: lines.join('\n'),
+    distanceMeters: total
+  };
 }
 
 /**
- * Build a simple cooldown block.
+ * Build a cooldown block.
  */
-function buildCooldownBlock(constraints: GenerateConstraints): string {
-  const distance = constraints.poolLengthMeters * 4; // e.g. 100m in 25m pool
-  return [
+function buildCooldownBlock(goal: GenerateConstraints): Block {
+  const pool = goal.poolLengthMeters;
+
+  // Short but not trivial cooldown.
+  const distance = goal.profile === 'elite' ? pool * 8 : pool * 4;
+
+  const lines: string[] = [
     'cooldown:',
     `  ${distance} choice easy`
-  ].join('\n');
+  ];
+
+  return {
+    dsl: lines.join('\n'),
+    distanceMeters: distance
+  };
 }
 
 /**
- * Build a main set block based on focus and remaining distance.
- *
- * The goal is to:
- *  - Choose a reasonable repeat distance
- *  - Scale reps so total ~= remainingForMain
+ * Build the main-set block based on focus and remaining distance.
  */
-function buildMainBlock(constraints: GenerateConstraints, remainingForMain: number): string {
-  // Ensure we have *some* main set distance
-  const minMainDistance = constraints.poolLengthMeters * 8; // e.g. 200m or 400m
-  const targetMainDistance = Math.max(remainingForMain, minMainDistance);
+function buildMainBlock(goal: GenerateConstraints, targetMainDistance: number): Block {
+  const pool = goal.poolLengthMeters;
 
-  // Choose a base repeat distance and label based on focus
-  let repeatDistance: number;
-  let stroke: string;
-  let intensity: string;
-  let sendOffSecondsGuess: number;
+  // If remaining distance is tiny, just create a short aerobic main.
+  const effectiveTarget = Math.max(targetMainDistance, pool * 8);
 
-  switch (constraints.focus) {
+  switch (goal.focus) {
     case 'threshold':
-      repeatDistance = 100;
-      stroke = 'FR';
-      intensity = 'thresh';
-      sendOffSecondsGuess = constraints.poolLengthMeters === 25 ? 95 : 110; // rough guesses
-      break;
+      return buildThresholdMain(goal, effectiveTarget);
     case 'sprint':
-      repeatDistance = 25;
-      stroke = 'FR';
-      intensity = 'sprint';
-      sendOffSecondsGuess = 35;
-      break;
+      return buildSprintMain(goal, effectiveTarget);
     case 'technique':
-      repeatDistance = 50;
-      stroke = 'drill';
-      intensity = 'easy';
-      sendOffSecondsGuess = 60;
-      break;
+      return buildTechniqueMain(goal, effectiveTarget);
     case 'aerobic':
     default:
-      repeatDistance = 100;
-      stroke = 'FR';
-      intensity = 'moderate';
-      sendOffSecondsGuess = constraints.poolLengthMeters === 25 ? 105 : 120;
-      break;
+      return buildAerobicMain(goal, effectiveTarget);
   }
-
-  // Compute reps to approximate the target main distance
-  const rawReps = Math.round(targetMainDistance / repeatDistance);
-  const reps = Math.max(rawReps, 4); // at least a few reps
-
-  // Convert send-off guess to "M:SS" string
-  const minutes = Math.floor(sendOffSecondsGuess / 60);
-  const seconds = sendOffSecondsGuess % 60;
-  const secondsPadded = seconds.toString().padStart(2, '0');
-  const sendOffStr = `${minutes}:${secondsPadded}`;
-
-  return [
-    'main:',
-    `  ${reps}x${repeatDistance} ${stroke} @${sendOffStr} ${intensity}`
-  ].join('\n');
 }
 
 /**
- * Very rough distance estimation for a DSL block.
- * We only support the simple patterns we generate ourselves:
- *   "<distance> ..."
- *   "<reps>x<distance> ..."
+ * Aerobic main = longer repeats at moderate effort.
  */
-function estimateBlockDistanceMeters(block: string): number {
-  const lines = block.split(/\r?\n/);
-  let total = 0;
+function buildAerobicMain(goal: GenerateConstraints, target: number): Block {
+  const pool = goal.poolLengthMeters;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.endsWith(':') || trimmed.startsWith('#')) {
-      continue;
-    }
+  // Use 200s or 400s depending on profile.
+  const baseRepeat =
+    goal.profile === 'elite'
+      ? 400
+      : goal.profile === 'intermediate'
+      ? 300
+      : 200;
 
-    // Try to match "repsxdistance" or "distance"
-    const match = trimmed.match(/^(?:(\d+)x)?(\d+)\b/);
-    if (!match) continue;
+  const repeatDistance = normalizeToPool(baseRepeat, pool);
 
-    const [, repsStr, distanceStr] = match;
-    const reps = repsStr ? Number.parseInt(repsStr, 10) : 1;
-    const distance = Number.parseInt(distanceStr, 10);
+  let reps = Math.max(Math.round(target / repeatDistance), 3);
+  const distance = reps * repeatDistance;
 
-    if (Number.isFinite(reps) && reps > 0 && Number.isFinite(distance) && distance > 0) {
-      total += reps * distance;
-    }
-  }
+  const sendOff = pool === 25 ? '3:00' : '4:30';
 
-  return total;
+  const lines: string[] = [
+    'main:',
+    `  ${reps}x${repeatDistance} FR @${sendOff} moderate`,
+    `  4x${pool} backstroke @1:00 easy`
+  ];
+
+  return {
+    dsl: lines.join('\n'),
+    distanceMeters: distance + 4 * pool
+  };
+}
+
+/**
+ * Threshold main = 100s/200s at threshold, maybe grouped as sets.
+ */
+function buildThresholdMain(goal: GenerateConstraints, target: number): Block {
+  const pool = goal.poolLengthMeters;
+
+  const repeatDistance = 100;
+  let reps = Math.max(Math.round(target / repeatDistance), 6);
+
+  // Round reps to multiple of 4 for nicer sets.
+  reps = Math.max(4, Math.round(reps / 4) * 4);
+
+  const distance = reps * repeatDistance;
+
+  // Simple sendoff logic
+  const baseSendOff = goal.profile === 'elite' ? '1:25' : goal.profile === 'intermediate' ? '1:35' : '1:45';
+
+  const lines: string[] = [
+    'main:',
+    `  # Threshold 100s`,
+    `  ${reps}x100 FR @${baseSendOff} thresh`,
+    `  ${pool * 4} FR easy`
+  ];
+
+  return {
+    dsl: lines.join('\n'),
+    distanceMeters: distance + pool * 4
+  };
+}
+
+/**
+ * Sprint main = 25s/50s fast with plenty of rest and some easy swimming.
+ */
+function buildSprintMain(goal: GenerateConstraints, target: number): Block {
+  const pool = goal.poolLengthMeters;
+
+  const repeatDistance = pool; // 25 or 50
+  let reps = Math.max(Math.round(target / (repeatDistance * 2)), 8); // half distance fast, half easy
+  // Keep reps in a reasonable range
+  reps = Math.min(Math.max(reps, 8), 24);
+
+  const fastDistance = reps * repeatDistance;
+  const easyDistance = reps * repeatDistance; // same volume of easy
+
+  const sendFast = pool === 25 ? '0:40' : '1:00';
+
+  const lines: string[] = [
+    'main:',
+    `  # Sprint 25s/50s`,
+    `  ${reps}x${repeatDistance} FR @${sendFast} sprint`,
+    `  ${reps}x${repeatDistance} FR easy`
+  ];
+
+  return {
+    dsl: lines.join('\n'),
+    distanceMeters: fastDistance + easyDistance
+  };
+}
+
+/**
+ * Technique main = shorter aerobic swimming plus drills.
+ */
+function buildTechniqueMain(goal: GenerateConstraints, target: number): Block {
+  const pool = goal.poolLengthMeters;
+
+  const aerobicRepeat = normalizeToPool(100, pool);
+  let aerobicReps = Math.max(Math.round(target * 0.6 / aerobicRepeat), 4);
+
+  const drillRepeat = pool;
+  let drillReps = Math.max(Math.round(target * 0.4 / drillRepeat), 4);
+
+  const aerobicDistance = aerobicReps * aerobicRepeat;
+  const drillDistance = drillReps * drillRepeat;
+
+  const lines: string[] = [
+    'main:',
+    `  # Technique-focused main`,
+    `  ${aerobicReps}x${aerobicRepeat} FR @2:00 aerobic`,
+    `  ${drillReps}x${drillRepeat} drill @1:00`,
+    `  ${pool * 4} choice easy`
+  ];
+
+  return {
+    dsl: lines.join('\n'),
+    distanceMeters: aerobicDistance + drillDistance + pool * 4
+  };
+}
+
+/**
+ * Ensure the repeat distance makes sense for the pool length.
+ * e.g., for 50m pool, 100, 150, 200 are fine; for 25m, we keep multiples of 25.
+ */
+function normalizeToPool(distance: number, pool: number): number {
+  const remainder = distance % pool;
+  if (remainder === 0) return distance;
+  return distance + (pool - remainder);
 }

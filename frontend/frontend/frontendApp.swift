@@ -22,6 +22,12 @@ struct frontendApp: App {
                         Image(systemName: "list.bullet")
                         Text("Workouts")
                     }
+
+                StatsView()
+                    .tabItem {
+                        Image(systemName: "chart.bar")
+                        Text("Stats")
+                    }
             }
         }
     }

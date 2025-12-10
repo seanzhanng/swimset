@@ -110,3 +110,14 @@ struct GetWorkoutResponseDTO: Codable {
     var workout: WorkoutRecordDTO
     var interpreted: InterpretedWorkoutDTO
 }
+
+// MARK: - Stats
+
+struct StatsSummaryDTO: Codable {
+    var totalDistanceMeters: Int
+    var workoutCount: Int
+    var distanceByFocus: [String: Int]
+    var distanceByProfile: [String: Int]
+    var distanceLast7Days: Int
+    var distanceLast30Days: Int
+}

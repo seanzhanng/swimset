@@ -128,6 +128,15 @@ final class APIClient {
         }
     }
 
+    /// GET /stats/summary
+    func getStatsSummary() async throws -> StatsSummaryDTO {
+        return try await request(
+            path: "/stats/summary",
+            method: "GET",
+            responseType: StatsSummaryDTO.self
+        )
+    }
+
     // MARK: - PDF API
 
     /// GET /workouts/:id/pdf?view=coach|swimmer
