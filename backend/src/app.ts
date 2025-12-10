@@ -3,6 +3,7 @@ import cors from 'cors';
 import interpretRouter from './routes/interpret';
 import generateRouter from './routes/generate';
 import workoutsRouter from './routes/workouts';
+import pdfRouter from './routes/pdf';
 
 const app: Application = express();
 
@@ -19,6 +20,7 @@ app.get('/health', (_req: Request, res: Response) => {
 app.use('/interpret', interpretRouter);
 app.use('/generate', generateRouter);
 app.use('/workouts', workoutsRouter);
+app.use('/workouts', pdfRouter); // provides /workouts/:id/pdf
 
 // 404 handler for unknown routes
 app.use((req: Request, res: Response) => {
