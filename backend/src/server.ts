@@ -1,3 +1,4 @@
+// src/server.ts
 import express from 'express';
 import cors from 'cors';
 import interpretRouter from './routes/interpret';
@@ -17,12 +18,14 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Core routes
+// Core JSON routes
 app.use('/interpret', interpretRouter);
 app.use('/generate', generateRouter);
 app.use('/workouts', workoutsRouter);
-app.use(pdfRouter);          // defines /workouts/:id/pdf
 app.use('/stats', statsRouter);
+
+// PDF route (defines GET /workouts/:id/pdf)
+app.use(pdfRouter);
 
 const PORT = process.env.PORT || 3000;
 
