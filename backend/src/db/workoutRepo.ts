@@ -1,10 +1,7 @@
+import { QueryResultRow } from 'pg';
 import { query } from './pool';
 
-/**
- * Shape of a workout as exposed to the rest of the app / API.
- * This uses camelCase to be friendly for TypeScript/Swift clients.
- */
-export interface WorkoutRecord {
+export interface WorkoutRow extends QueryResultRow {
   id: string;
   title: string | null;
   poolLengthMeters: number | null;
@@ -17,24 +14,17 @@ export interface WorkoutRecord {
   updatedAt: Date;
 }
 
-/**
- * Shape of the raw DB row as returned by Postgres.
- * This matches the column names in the workouts table.
- */
-interface WorkoutRow {
-  id: string;
-  title: string | null;
-  pool_length_meters: number | null;
-  planned_duration_minutes: number | null;
-  focus: string | null;
-  profile: string | null;
+interface CreateWorkoutParams {
+  title?: string;
+  poolLengthMeters?: number;
+  plannedDurationMinutes?: number;
+  focus?: string;
+  profile?: string;
   shorthand: string;
-  total_distance_meters: number | null;
-  created_at: Date;
-  updated_at: Date;
+  totalDistanceMeters?: number;
 }
 
-export interface CreateWorkoutInput {
+interface UpdateWorkoutParams {
   title?: string;
   poolLengthMeters?: number;
   plannedDurationMinutes?: number;
@@ -45,27 +35,19 @@ export interface CreateWorkoutInput {
 }
 
 /**
- * Map a raw DB row (snake_case) into a WorkoutRecord (camelCase).
+ * Insert a new workout row and return the created record (camelCased).
  */
-function mapRow(row: WorkoutRow): WorkoutRecord {
-  return {
-    id: row.id,
-    title: row.title,
-    poolLengthMeters: row.pool_length_meters,
-    plannedDurationMinutes: row.planned_duration_minutes,
-    focus: row.focus,
-    profile: row.profile,
-    shorthand: row.shorthand,
-    totalDistanceMeters: row.total_distance_meters,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
+export async function createWorkout(params: CreateWorkoutParams): Promise<WorkoutRow> {
+  const {
+    title,
+    poolLengthMeters,
+    plannedDurationMinutes,
+    focus,
+    profile,
+    shorthand,
+    totalDistanceMeters
+  } = params;
 
-/**
- * Insert a new workout and return the created record.
- */
-export async function createWorkout(input: CreateWorkoutInput): Promise<WorkoutRecord> {
   const result = await query<WorkoutRow>(
     `
     INSERT INTO workouts (
@@ -81,83 +63,152 @@ export async function createWorkout(input: CreateWorkoutInput): Promise<WorkoutR
     RETURNING
       id,
       title,
-      pool_length_meters,
-      planned_duration_minutes,
+      pool_length_meters       AS "poolLengthMeters",
+      planned_duration_minutes AS "plannedDurationMinutes",
       focus,
       profile,
       shorthand,
-      total_distance_meters,
-      created_at,
-      updated_at
+      total_distance_meters    AS "totalDistanceMeters",
+      created_at               AS "createdAt",
+      updated_at               AS "updatedAt"
     `,
     [
-      input.title ?? null,
-      input.poolLengthMeters ?? null,
-      input.plannedDurationMinutes ?? null,
-      input.focus ?? null,
-      input.profile ?? null,
-      input.shorthand,
-      input.totalDistanceMeters ?? null
+      title ?? null,
+      poolLengthMeters ?? null,
+      plannedDurationMinutes ?? null,
+      focus ?? null,
+      profile ?? null,
+      shorthand,
+      totalDistanceMeters ?? null
     ]
   );
 
-  const row = result.rows[0];
-  return mapRow(row);
+  return result.rows[0];
 }
 
 /**
- * Fetch a single workout by ID.
+ * Update an existing workout row and return the updated record, or null if not found.
  */
-export async function getWorkoutById(id: string): Promise<WorkoutRecord | null> {
+export async function updateWorkoutById(
+  id: string,
+  params: UpdateWorkoutParams
+): Promise<WorkoutRow | null> {
+  const {
+    title,
+    poolLengthMeters,
+    plannedDurationMinutes,
+    focus,
+    profile,
+    shorthand,
+    totalDistanceMeters
+  } = params;
+
+  const result = await query<WorkoutRow>(
+    `
+    UPDATE workouts
+    SET
+      title                   = $2,
+      pool_length_meters      = $3,
+      planned_duration_minutes= $4,
+      focus                   = $5,
+      profile                 = $6,
+      shorthand               = $7,
+      total_distance_meters   = $8,
+      updated_at              = now()
+    WHERE id = $1
+    RETURNING
+      id,
+      title,
+      pool_length_meters       AS "poolLengthMeters",
+      planned_duration_minutes AS "plannedDurationMinutes",
+      focus,
+      profile,
+      shorthand,
+      total_distance_meters    AS "totalDistanceMeters",
+      created_at               AS "createdAt",
+      updated_at               AS "updatedAt"
+    `,
+    [
+      id,
+      title ?? null,
+      poolLengthMeters ?? null,
+      plannedDurationMinutes ?? null,
+      focus ?? null,
+      profile ?? null,
+      shorthand,
+      totalDistanceMeters ?? null
+    ]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+/**
+ * Fetch a single workout by id.
+ */
+export async function getWorkoutById(id: string): Promise<WorkoutRow | null> {
   const result = await query<WorkoutRow>(
     `
     SELECT
       id,
       title,
-      pool_length_meters,
-      planned_duration_minutes,
+      pool_length_meters       AS "poolLengthMeters",
+      planned_duration_minutes AS "plannedDurationMinutes",
       focus,
       profile,
       shorthand,
-      total_distance_meters,
-      created_at,
-      updated_at
+      total_distance_meters    AS "totalDistanceMeters",
+      created_at               AS "createdAt",
+      updated_at               AS "updatedAt"
     FROM workouts
     WHERE id = $1
     `,
     [id]
   );
 
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  return mapRow(result.rows[0]);
+  return result.rows[0] ?? null;
 }
 
 /**
- * List workouts, most recent first.
+ * List all workouts (for now, ordered newest first).
  */
-export async function listWorkouts(limit = 50): Promise<WorkoutRecord[]> {
+export async function listWorkouts(): Promise<WorkoutRow[]> {
   const result = await query<WorkoutRow>(
     `
     SELECT
       id,
       title,
-      pool_length_meters,
-      planned_duration_minutes,
+      pool_length_meters       AS "poolLengthMeters",
+      planned_duration_minutes AS "plannedDurationMinutes",
       focus,
       profile,
       shorthand,
-      total_distance_meters,
-      created_at,
-      updated_at
+      total_distance_meters    AS "totalDistanceMeters",
+      created_at               AS "createdAt",
+      updated_at               AS "updatedAt"
     FROM workouts
     ORDER BY created_at DESC
-    LIMIT $1
-    `,
-    [limit]
+    `
   );
 
-  return result.rows.map(mapRow);
-} 
+  return result.rows;
+}
+
+/**
+ * Delete a workout by id.
+ *
+ * Returns true if a row was deleted, false if not found.
+ */
+export async function deleteWorkoutById(id: string): Promise<boolean> {
+  const result = await query(
+    `
+    DELETE FROM workouts
+    WHERE id = $1
+    RETURNING id
+    `,
+    [id]
+  );
+
+  const rowCount = result.rowCount ?? 0;
+  return rowCount > 0;
+}

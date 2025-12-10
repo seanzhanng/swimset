@@ -11,7 +11,7 @@ struct WorkoutHeader: Codable {
 }
 
 struct WorkoutSetInterval: Codable, Identifiable {
-    let id = UUID()  // Local UUID for SwiftUI rendering
+    let id: UUID = UUID()  // Local SwiftUI-only ID
 
     var section: String
     var reps: Int
@@ -21,6 +21,10 @@ struct WorkoutSetInterval: Codable, Identifiable {
     var intensity: String?
     var raw: String
     var lineNumber: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case section, reps, distanceMeters, stroke, sendOffSeconds, intensity, raw, lineNumber
+    }
 }
 
 struct WorkoutTotals: Codable {
@@ -50,8 +54,8 @@ struct GenerateConstraintsDTO: Codable {
     var poolLengthMeters: Int
     var targetDistanceMeters: Int?
     var targetDurationMinutes: Int?
-    var focus: String                // e.g., threshold, aerobic
-    var profile: String              // novice/intermediate/elite
+    var focus: String
+    var profile: String
     var title: String?
 }
 
@@ -76,6 +80,15 @@ struct WorkoutRecordDTO: Codable, Identifiable {
 }
 
 struct CreateWorkoutRequestDTO: Codable {
+    var title: String?
+    var shorthand: String
+    var poolLengthMeters: Int?
+    var plannedDurationMinutes: Int?
+    var focus: String?
+    var profile: String?
+}
+
+struct UpdateWorkoutRequestDTO: Codable {
     var title: String?
     var shorthand: String
     var poolLengthMeters: Int?

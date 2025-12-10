@@ -42,7 +42,7 @@ final class APIClient {
         self.jsonEncoder = encoder
     }
 
-    // MARK: - Public API
+    // MARK: - Public JSON API
 
     /// POST /interpret
     func interpret(shorthand: String) async throws -> InterpretedWorkoutDTO {
@@ -77,6 +77,16 @@ final class APIClient {
         )
     }
 
+    /// PUT /workouts/:id
+    func updateWorkout(id: String, requestDTO: UpdateWorkoutRequestDTO) async throws -> GetWorkoutResponseDTO {
+        return try await request(
+            path: "/workouts/\(id)",
+            method: "PUT",
+            body: requestDTO,
+            responseType: GetWorkoutResponseDTO.self
+        )
+    }
+
     /// GET /workouts
     func listWorkouts() async throws -> [WorkoutRecordDTO] {
         let response: ListWorkoutsResponseDTO = try await request(
@@ -96,9 +106,61 @@ final class APIClient {
         )
     }
 
-    // MARK: - Core request helpers
+    /// DELETE /workouts/:id
+    func deleteWorkout(id: String) async throws {
+        let path = "/workouts/\(id)"
 
-    /// Request with JSON body (POST)
+        guard let url = URL(string: path, relativeTo: baseURL) else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.noData
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw APIError.badStatusCode(httpResponse.statusCode)
+        }
+    }
+
+    // MARK: - PDF API
+
+    /// GET /workouts/:id/pdf?view=coach|swimmer
+    func downloadWorkoutPDF(id: String, view: String) async throws -> Data {
+        let path = "/workouts/\(id)/pdf?view=\(view)"
+
+        guard let url = URL(string: path, relativeTo: baseURL) else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/pdf", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.noData
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw APIError.badStatusCode(httpResponse.statusCode)
+        }
+
+        guard !data.isEmpty else {
+            throw APIError.noData
+        }
+
+        return data
+    }
+
+    // MARK: - Core JSON request helpers
+
     private func request<Body: Encodable, Response: Decodable>(
         path: String,
         method: String,
@@ -123,10 +185,9 @@ final class APIClient {
 
         let (data, response) = try await session.data(for: request)
 
-        return try handleResponse(data: data, response: response, path: path)
+        return try handleJSONResponse(data: data, response: response, path: path)
     }
 
-    /// Request without body (GET)
     private func request<Response: Decodable>(
         path: String,
         method: String,
@@ -143,10 +204,10 @@ final class APIClient {
 
         let (data, response) = try await session.data(for: request)
 
-        return try handleResponse(data: data, response: response, path: path)
+        return try handleJSONResponse(data: data, response: response, path: path)
     }
 
-    private func handleResponse<Response: Decodable>(
+    private func handleJSONResponse<Response: Decodable>(
         data: Data,
         response: URLResponse,
         path: String

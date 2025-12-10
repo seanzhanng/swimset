@@ -16,6 +16,12 @@ struct frontendApp: App {
                         Image(systemName: "wand.and.stars")
                         Text("Generate")
                     }
+
+                WorkoutsListView()
+                    .tabItem {
+                        Image(systemName: "list.bullet")
+                        Text("Workouts")
+                    }
             }
         }
     }

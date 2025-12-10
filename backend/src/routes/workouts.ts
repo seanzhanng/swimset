@@ -1,125 +1,84 @@
 import { Router, Request, Response } from 'express';
 import { interpretShorthand } from '../core/dsl/interpreter';
-import { InterpretedWorkout } from '../core/models/WorkoutTypes';
 import {
   createWorkout,
   getWorkoutById,
   listWorkouts,
-  CreateWorkoutInput,
-  WorkoutRecord
+  deleteWorkoutById,
+  updateWorkoutById,
+  WorkoutRow
 } from '../db/workoutRepo';
 
 const router = Router();
 
-interface CreateWorkoutRequestBody {
-  title?: string;
-  shorthand: string;
-  poolLengthMeters?: number;
-  plannedDurationMinutes?: number;
-  focus?: string;
-  profile?: string;
-}
-
 /**
  * POST /workouts
+ * Body: { title?, shorthand, poolLengthMeters?, plannedDurationMinutes?, focus?, profile? }
  *
- * Creates a new workout from raw shorthand DSL and optional metadata.
- *
- * Request body:
- *   {
- *     "title": "Threshold Tuesday",
- *     "shorthand": "pool 25m\nwarmup:\n  200 FR easy\n  4x50 drill @1:00\nmain:\n  10x100 FR @1:40 thresh\ncooldown:\n  100 choice easy\n",
- *     "poolLengthMeters": 25,
- *     "plannedDurationMinutes": 90,
- *     "focus": "threshold",
- *     "profile": "intermediate"
- *   }
- *
- * Response:
- *   {
- *     "workout": WorkoutRecord,
- *     "interpreted": InterpretedWorkout
- *   }
+ * - Interprets the shorthand
+ * - Computes total distance
+ * - Saves to DB
+ * - Returns { workout, interpreted }
  */
-router.post('/', async (req: Request<unknown, unknown, CreateWorkoutRequestBody>, res: Response) => {
-  const { title, shorthand, poolLengthMeters, plannedDurationMinutes, focus, profile } = req.body || {};
-
-  if (typeof shorthand !== 'string' || shorthand.trim().length === 0) {
-    return res.status(400).json({
-      error: 'Invalid "shorthand". Expected non-empty string.'
-    });
-  }
-
-  if (
-    poolLengthMeters !== undefined &&
-    (typeof poolLengthMeters !== 'number' || !Number.isFinite(poolLengthMeters) || poolLengthMeters <= 0)
-  ) {
-    return res.status(400).json({
-      error: 'Invalid "poolLengthMeters". If provided, must be a positive number.'
-    });
-  }
-
-  if (
-    plannedDurationMinutes !== undefined &&
-    (typeof plannedDurationMinutes !== 'number' ||
-      !Number.isFinite(plannedDurationMinutes) ||
-      plannedDurationMinutes <= 0)
-  ) {
-    return res.status(400).json({
-      error: 'Invalid "plannedDurationMinutes". If provided, must be a positive number.'
-    });
-  }
-
+router.post('/', async (req: Request, res: Response) => {
   try {
-    // Interpret to compute totals and validate DSL
-    const interpreted: InterpretedWorkout = interpretShorthand(shorthand);
-
-    const createInput: CreateWorkoutInput = {
+    const {
       title,
       shorthand,
       poolLengthMeters,
       plannedDurationMinutes,
       focus,
-      profile,
-      totalDistanceMeters: interpreted.totals.totalDistanceMeters
+      profile
+    } = req.body as {
+      title?: string;
+      shorthand?: string;
+      poolLengthMeters?: number;
+      plannedDurationMinutes?: number;
+      focus?: string;
+      profile?: string;
     };
 
-    const workout: WorkoutRecord = await createWorkout(createInput);
+    if (!shorthand || typeof shorthand !== 'string') {
+      return res.status(400).json({ error: 'shorthand is required and must be a string.' });
+    }
 
-    return res.status(201).json({
-      workout,
-      interpreted
+    const interpreted = interpretShorthand(shorthand);
+    const totalDistanceMeters = interpreted.totals.totalDistanceMeters;
+
+    const workout = await createWorkout({
+      title,
+      poolLengthMeters,
+      plannedDurationMinutes,
+      focus,
+      profile,
+      shorthand,
+      totalDistanceMeters
     });
+
+    return res.status(201).json({ workout, interpreted });
   } catch (err) {
     console.error('Error creating workout:', err);
-    return res.status(500).json({
-      error: 'Failed to create workout.'
-    });
+    return res.status(500).json({ error: 'Failed to create workout.' });
   }
 });
 
 /**
  * GET /workouts
- *
- * List recent workouts (metadata only, no interpretation).
+ * Returns: { workouts: WorkoutRow[] }
  */
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    const workouts = await listWorkouts(50);
-    return res.status(200).json({ workouts });
+    const workouts: WorkoutRow[] = await listWorkouts();
+    return res.json({ workouts });
   } catch (err) {
     console.error('Error listing workouts:', err);
-    return res.status(500).json({
-      error: 'Failed to list workouts.'
-    });
+    return res.status(500).json({ error: 'Failed to list workouts.' });
   }
 });
 
 /**
  * GET /workouts/:id
- *
- * Fetch a single workout and return both the saved record and
- * the interpreted structure.
+ * Returns: { workout, interpreted }
  */
 router.get('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -131,17 +90,90 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Workout not found.' });
     }
 
-    const interpreted: InterpretedWorkout = interpretShorthand(workout.shorthand);
-
-    return res.status(200).json({
-      workout,
-      interpreted
-    });
+    const interpreted = interpretShorthand(workout.shorthand);
+    return res.json({ workout, interpreted });
   } catch (err) {
-    console.error('Error fetching workout by ID:', err);
-    return res.status(500).json({
-      error: 'Failed to fetch workout.'
+    console.error('Error fetching workout:', err);
+    return res.status(500).json({ error: 'Failed to fetch workout.' });
+  }
+});
+
+/**
+ * PUT /workouts/:id
+ * Body: { title?, shorthand, poolLengthMeters?, plannedDurationMinutes?, focus?, profile? }
+ *
+ * - Re-interprets shorthand
+ * - Updates DB row
+ * - Returns { workout, interpreted }
+ */
+router.put('/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const {
+      title,
+      shorthand,
+      poolLengthMeters,
+      plannedDurationMinutes,
+      focus,
+      profile
+    } = req.body as {
+      title?: string;
+      shorthand?: string;
+      poolLengthMeters?: number;
+      plannedDurationMinutes?: number;
+      focus?: string;
+      profile?: string;
+    };
+
+    if (!shorthand || typeof shorthand !== 'string') {
+      return res.status(400).json({ error: 'shorthand is required and must be a string.' });
+    }
+
+    const interpreted = interpretShorthand(shorthand);
+    const totalDistanceMeters = interpreted.totals.totalDistanceMeters;
+
+    const updated = await updateWorkoutById(id, {
+      title,
+      poolLengthMeters,
+      plannedDurationMinutes,
+      focus,
+      profile,
+      shorthand,
+      totalDistanceMeters
     });
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Workout not found.' });
+    }
+
+    return res.json({ workout: updated, interpreted });
+  } catch (err) {
+    console.error('Error updating workout:', err);
+    return res.status(500).json({ error: 'Failed to update workout.' });
+  }
+});
+
+/**
+ * DELETE /workouts/:id
+ * - Deletes a workout
+ * - 204 if deleted
+ * - 404 if not found
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const deleted = await deleteWorkoutById(id);
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Workout not found.' });
+    }
+
+    return res.status(204).send();
+  } catch (err) {
+    console.error('Error deleting workout:', err);
+    return res.status(500).json({ error: 'Failed to delete workout.' });
   }
 });
 
