@@ -1,2 +1,2 @@
 # swimset
-a swim workout builder and dsl parser for coaches
+a swim workout builder and dsl parser
